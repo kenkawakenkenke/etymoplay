@@ -1,6 +1,7 @@
 import fs from 'fs';
 import Papa from 'papaparse';
 import chalk from 'chalk';
+import { printTerm, hasChildId, getLeaves, getAllIds, walkTerm } from './terms.js';
 
 // RELATION FUNCTIONS: PRINT
 function print(prefix, relation) {
@@ -34,7 +35,6 @@ function printRaw(relations) {
     }
 }
 
-
 // RELATION FUNCTIONS: PARSE
 
 function parseLeaf(relation) {
@@ -43,6 +43,7 @@ function parseLeaf(relation) {
         term: relation.related_term,
         lang: relation.related_lang,
         parents: [],
+        type: relation.reltype,
     }
 }
 
@@ -144,60 +145,12 @@ function termFromRelations(termRoot, childRelations) {
     return termRoot;
 }
 
-function hasChildId(term, id) {
-    for (const parent of term.parents) {
-        if (parent.id === id) return true;
-        if (hasChildId(parent, id)) return true;
-    }
-    return false;
-}
-
-function getLeaves(term, leaves) {
-    if (term.parents.length === 0) {
-        leaves.push(term);
-    }
-    for (const parent of term.parents) {
-        getLeaves(parent, leaves);
-    }
-    return leaves;
-}
-
-function getAllIds(term, ids) {
-    ids[term.id] = true;
-    for (const parent of term.parents) {
-        getAllIds(parent, ids);
-    }
-    return ids;
-}
-function depth(term) {
-    if (term.parents.length === 0) return 0;
-    var max = 0;
-    for (const parent of term.parents) {
-        max = Math.max(max, depth(parent));
-    }
-    return max + 1;
-}
-
-// TERM FUNCTIONS: PRINT
-function printTerm(prefix, term) {
-    console.log(
-        prefix +
-        chalk.red(term.term || "-") + " " + chalk.green(term.lang || "-")
-        + " " + term.id
-    );
-    for (const parent of term.parents) {
-        printTerm(prefix + "  ", parent);
-    }
-}
-
-function processTermRelations(relations) {
-    // Boring ones (for now)
-    // Abort if every relation in input array are English.
-    // if (relations.every(relation => relation.related_lang === 'English' || relation.related_lang === '')) return;
-
+function processTermRelations(relations, interestingTermsMap) {
     // Filter out has_root. These seem to not be meaningful.
     relations = relations.filter(relation => relation.reltype !== 'has_root');
     if (relations.length === 0) return null;
+
+    const interesting = interestingTermsMap[relations[0].term.toLowerCase()];
 
     const relationByGroup = {};
     for (const relation of relations) {
@@ -221,6 +174,7 @@ function processTermRelations(relations) {
         lang: relations[0].lang,
         id: relations[0].term_id,
         parents: [],
+        debugRawRelations: relations,
     };
 
     // First try to pick a group_derived_root.
@@ -247,7 +201,7 @@ function processTermRelations(relations) {
             }
             termRoot.parents.push(parseLeaf(relation));
         }
-        return;
+        return termRoot;
     }
     if (firstType === "has_prefix" || firstType === "has_prefix_with_root") {
         for (const relation of relationsWithoutParents) {
@@ -256,7 +210,7 @@ function processTermRelations(relations) {
             }
             termRoot.parents.push(parseLeaf(relation));
         }
-        return;
+        return termRoot;
     }
 
     // Catch all
@@ -264,23 +218,21 @@ function processTermRelations(relations) {
     if (relationsWithoutParents.length >= 2 && relationsWithoutParents[1].reltype === "has_suffix") {
         termRoot.parents.push(parseLeaf(relationsWithoutParents[1]));
     }
+    return termRoot;
 }
 
 
-function loadTerms(results) {
+function loadTerms(results, interestingTermsMap) {
     const terms = [];
 
     var currentTerm = [];
     for (const relation of results) {
-        // if (relation.lang !== 'English') continue;
-        // if (!interestingTerms[relation.term.toLowerCase()]) continue;
-
         // Probably don't care about doublets.
         if (relation.reltype === 'doublet_with') continue;
         if (relation.reltype === 'cognate_of') continue;
 
         if (currentTerm.length !== 0 && currentTerm[0].term !== relation.term) {
-            const term = processTermRelations(currentTerm);
+            const term = processTermRelations(currentTerm, interestingTermsMap);
             if (term) {
                 terms.push(term);
             }
@@ -289,7 +241,7 @@ function loadTerms(results) {
         currentTerm.push(relation);
     }
     if (currentTerm.length > 0) {
-        const term = processTermRelations(currentTerm);
+        const term = processTermRelations(currentTerm, interestingTermsMap);
         if (term) {
             terms.push(term);
         }
@@ -297,10 +249,16 @@ function loadTerms(results) {
     var numFound = 0;
     const termForId = {};
     for (const term of terms) {
-        if (term.parents.length === 0) continue;
+        const interesting = interestingTermsMap[term.term.toLowerCase()];
+
+        if (term.parents.length === 0) {
+            if (interesting) console.log("Ignoring " + term.term + " because it has no parents");
+            continue;
+        }
 
         // Kill self references.
         if (hasChildId(term, term.id)) {
+            if (interesting) console.log("Ignoring " + term.term + " because it has a self reference");
             continue;
         }
         termForId[term.id] = term;
@@ -317,26 +275,34 @@ const results = Papa.parse(data, {
     skipEmptyLines: true
 }).data;
 
-const interestingTerms = {
-    "pteranodon": true,
-    "autobiography": true,
-    "arachniphobia": true,
-    "gentleman": true,
-    "gentle": true,
-    "man": true,
-    "telescope": true,
-    "escalator": true,
-    "helicopter": true,
-    "japanese": true,
-    "japan": true,
-    "englishman": true,
-    "blindspot": true,
-    "microwave": true,
-}
+const interestingTerms = [
+    "pteranodon",
+    "autobiography",
+    "arachniphobia",
+    "gentleman",
+    "gentle",
+    "man",
+    "telescope",
+    "escalator",
+    "helicopter",
+    "japanese",
+    "japan",
+    "englishman",
+    "blindspot",
+    "microwave",
+    "山中部",
+    "heliocentric",
+];
+const interestingTermsMap = interestingTerms.reduce((acc, term) => {
+    acc[term.toLowerCase()] = true;
+    return acc;
+}, Object.create(null));
 
-const terms = loadTerms(results);
+const termForId = loadTerms(results, interestingTermsMap);
+const terms = Object.values(termForId);
 
-for (const term of Object.values(terms)) {
+// Expand leaves.
+for (const term of terms) {
     for (const leaf of getLeaves(term, [])) {
         const moreParents = terms[leaf.id]?.parents || [];
         for (const child of moreParents) {
@@ -358,11 +324,20 @@ for (const term of Object.values(terms)) {
     }
 }
 
-for (const term of Object.values(terms)) {
-    if (interestingTerms[term.term.toLowerCase()]) {
-        // if (depth(term) > 3) {
+for (const term of terms) {
+    if (interestingTermsMap[term.term.toLowerCase()]) {
+        console.log("------------");
         printTerm("", term);
+        console.log("raw:");
+        printRaw(term.debugRawRelations);
     }
 }
 
-fs.writeFileSync('../data/terms.json', JSON.stringify(terms, null, 2));
+// Delete term.debugRawRelations for saving.
+for (const term of terms) {
+    walkTerm(term, term => {
+        delete term.debugRawRelations;
+    });
+}
+console.log("Exporting: " + Object.keys(terms).length + " terms");
+fs.writeFileSync('../data/terms.json', JSON.stringify(terms, null, 0));
