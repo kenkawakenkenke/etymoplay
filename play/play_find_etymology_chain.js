@@ -19,13 +19,13 @@ for (const term of Object.values(terms)) {
     term.ending = [];
 
     // Ignore any terms that have calques.
-    var hasCalque = false;
+    var hasUninterestingTerm = false;
     walkTerm(term, t => {
-        if (t.type === "calque_of") {
-            hasCalque = true;
+        if (t.type === "calque_of" || t.type === "clipping_of") {
+            hasUninterestingTerm = true;
         }
     });
-    if (hasCalque) continue;
+    if (hasUninterestingTerm) continue;
 
     // Add to termsStartingWith.
     let current = term;
@@ -52,7 +52,7 @@ for (const term of Object.values(terms)) {
     }
 }
 
-const firstTerm = Object.values(terms).find(term => term.term.toLowerCase() === "heliocentric" && term.lang === "English");
+const firstTerm = Object.values(terms).find(term => term.term.toLowerCase() === "pteranodon" && term.lang === "English");
 
 printTerm("", firstTerm);
 
@@ -61,6 +61,8 @@ for (const endingId of firstTerm.ending) {
     for (const endingTerm of endingTerms) {
         if (endingTerm.lang === "English" && endingTerm.term !== firstTerm.term) {
             console.log("next: " + endingTerm.term + " " + (terms[endingId]?.term || ""));
+
+            printTerm("", endingTerm);
         }
     }
 }
