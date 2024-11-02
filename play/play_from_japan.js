@@ -23,6 +23,19 @@ for (const englishTerm of Object.values(terms).filter(term => term.lang === "Eng
 /**/
 
 // Japanese words that have English origins.
+const obviousAncestors = {
+    "Japanese": true,
+    "Old Japanese": true,
+    "Middle Chinese": true,
+    "Literary Chinese": true,
+    "Chinese": true,
+    "Okinawan": true,
+    "Korean": true,
+    "Ainu": true,
+    "Mandarin": true,
+    "Cantonese": true,
+    "Proto-Japonic": true,
+};
 for (const japaneseTerm of Object.values(terms).filter(term => term.lang === "Japanese")) {
     // Select only terms that contain kanji.
     if (!japaneseTerm.term.match(/[\u4E00-\u9FFF]+/)) {
@@ -34,9 +47,7 @@ for (const japaneseTerm of Object.values(terms).filter(term => term.lang === "Ja
     }
     var englishParent = null;
     walkTerm(japaneseTerm, term => {
-        if (term.lang === "English") {
-            if (!englishParent) englishParent = term;
-        }
+        if (!obviousAncestors[term.lang] && !englishParent) englishParent = term;
     });
     if (englishParent && englishParent.type !== "calque_of") {
         printTerm("", japaneseTerm);
