@@ -1,7 +1,7 @@
 import fs from 'fs';
 import Papa from 'papaparse';
 import chalk from 'chalk';
-import { printTerm, hasChildId, getLeaves, getAllIds, walkTerm } from './terms.js';
+import { printTerm, hasChildId, getLeaves, getAllIds, walkTerm, exportTerms } from './terms.js';
 
 // RELATION FUNCTIONS: PRINT
 function print(prefix, relation) {
@@ -65,9 +65,14 @@ function parseFlatRelations(relations) {
 
         // When a level has multiple terms, it is a composite term of leaves.
         if (levelTerms.length > 1) {
+            const groupTerm = {
+                type: "inline affix group",
+                parents: [],
+            };
             for (const leafRelation of levelTerms) {
-                childGroups.push(parseLeaf(leafRelation));
+                groupTerm.parents.push(parseLeaf(leafRelation));
             }
+            childGroups.push(groupTerm);
             continue;
         }
         const leafRelation = levelTerms[0];
@@ -223,8 +228,7 @@ function processTermRelations(relations, interestingTermsMap) {
 
 
 function loadTerms(results, interestingTermsMap) {
-    const terms = [];
-
+    const rawTerms = [];
     var currentTerm = [];
     for (const relation of results) {
         // Probably don't care about doublets.
@@ -234,7 +238,7 @@ function loadTerms(results, interestingTermsMap) {
         if (currentTerm.length !== 0 && currentTerm[0].term !== relation.term) {
             const term = processTermRelations(currentTerm, interestingTermsMap);
             if (term) {
-                terms.push(term);
+                rawTerms.push(term);
             }
             currentTerm = [];
         }
@@ -243,28 +247,47 @@ function loadTerms(results, interestingTermsMap) {
     if (currentTerm.length > 0) {
         const term = processTermRelations(currentTerm, interestingTermsMap);
         if (term) {
-            terms.push(term);
+            rawTerms.push(term);
         }
     }
-    var numFound = 0;
+    const terms = [];
     const termForId = {};
-    for (const term of terms) {
-        const interesting = interestingTermsMap[term.term.toLowerCase()];
-
+    for (const term of rawTerms) {
         if (term.parents.length === 0) {
-            if (interesting) console.log("Ignoring " + term.term + " because it has no parents");
             continue;
         }
-
         // Kill self references.
         if (hasChildId(term, term.id)) {
-            if (interesting) console.log("Ignoring " + term.term + " because it has a self reference");
             continue;
         }
         termForId[term.id] = term;
+        terms.push(term);
     }
-    console.log(`found ${Object.keys(termForId).length} terms`);
-    return termForId;
+
+    // Expand leaves.
+    for (const term of terms) {
+        for (const leaf of getLeaves(term, [])) {
+            const moreParents = termForId[leaf.id]?.parents || [];
+
+            for (const child of moreParents) {
+                const termIds = getAllIds(term, {});
+                const childIds = getAllIds(child, {});
+
+                // See if there are any intersections between termIds and childIds (except for term.id).
+                let hasIntersection = false;
+                for (const id of Object.keys(childIds)) {
+                    if (id !== term.id && termIds[id]) {
+                        hasIntersection = true;
+                        break;
+                    }
+                }
+                if (!hasIntersection) {
+                    leaf.parents.push(child);
+                }
+            }
+        }
+    }
+    return terms;
 }
 
 
@@ -284,6 +307,7 @@ const interestingTerms = [
     "man",
     "telescope",
     "escalator",
+    "escalate",
     "helicopter",
     "japanese",
     "japan",
@@ -292,37 +316,14 @@ const interestingTerms = [
     "microwave",
     "山中部",
     "heliocentric",
+    "hemipteral",
 ];
 const interestingTermsMap = interestingTerms.reduce((acc, term) => {
     acc[term.toLowerCase()] = true;
     return acc;
 }, Object.create(null));
 
-const termForId = loadTerms(results, interestingTermsMap);
-const terms = Object.values(termForId);
-
-// Expand leaves.
-for (const term of terms) {
-    for (const leaf of getLeaves(term, [])) {
-        const moreParents = terms[leaf.id]?.parents || [];
-        for (const child of moreParents) {
-            const termIds = getAllIds(term, {});
-            const childIds = getAllIds(child, {});
-
-            // See if there are any intersections between termIds and childIds (except for term.id).
-            let hasIntersection = false;
-            for (const id of Object.keys(childIds)) {
-                if (id !== term.id && termIds[id]) {
-                    hasIntersection = true;
-                    break;
-                }
-            }
-            if (!hasIntersection) {
-                leaf.parents.push(child);
-            }
-        }
-    }
-}
+const terms = loadTerms(results, interestingTermsMap);
 
 for (const term of terms) {
     if (interestingTermsMap[term.term.toLowerCase()]) {
@@ -330,7 +331,14 @@ for (const term of terms) {
         printTerm("", term);
         console.log("raw:");
         printRaw(term.debugRawRelations);
+        console.log();
     }
+    // if (term.term.toLowerCase() === "hemipterus" && term.lang === "Latin") {
+    //     console.log("------------");
+    //     printTerm("", term);
+    //     console.log("raw:");
+    //     printRaw(term.debugRawRelations);
+    // }
 }
 
 // Delete term.debugRawRelations for saving.
@@ -339,5 +347,6 @@ for (const term of terms) {
         delete term.debugRawRelations;
     });
 }
-console.log("Exporting: " + Object.keys(terms).length + " terms");
-fs.writeFileSync('../data/terms.json', JSON.stringify(terms, null, 0));
+
+// exportTerms(terms, '../data/', 150000);
+

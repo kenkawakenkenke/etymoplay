@@ -1,8 +1,8 @@
 import fs from 'fs';
-import { walkTerm, printTerm } from './terms.js';
+import { walkTerm, printTerm, loadStoredTerms } from './terms.js';
 
-// Map of terms keyed by their IDs.
-const terms = JSON.parse(fs.readFileSync('../data/terms.json', 'utf8'));
+const terms = loadStoredTerms('../data/');
+console.log("Loaded: " + terms.length);
 
 const termsStartingWith = {};
 const termsEndingWith = {};
@@ -14,7 +14,7 @@ function appendTo(map, key, value) {
     map[key].push(value);
 }
 
-for (const term of Object.values(terms)) {
+for (const term of terms) {
     term.starting = [];
     term.ending = [];
 
@@ -52,7 +52,7 @@ for (const term of Object.values(terms)) {
     }
 }
 
-const firstTerm = Object.values(terms).find(term => term.term.toLowerCase() === "pteranodon" && term.lang === "English");
+const firstTerm = terms.find(term => term.term.toLowerCase() === "helicopter" && term.lang === "English");
 
 printTerm("", firstTerm);
 
