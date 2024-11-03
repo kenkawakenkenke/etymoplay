@@ -88,7 +88,7 @@ function lowestCommonTerm(term1, term2) {
     return null;
 }
 
-function getConnectedTerms(prevTerm, termsStartingWith) {
+function getConnectedTerms(prevTerm, termsStartingWith, termsForId) {
     const allConnectedTermIds = {};
     for (const endingTerm of prevTerm.ending) {
         const connectedTerms = termsStartingWith[endingTerm.id] || [];
@@ -109,26 +109,9 @@ function getConnectedTerms(prevTerm, termsStartingWith) {
     return allConnectedTerms;
 }
 
-console.log("Creating connection graph");
-const connectedTermsForId = {};
-var numConnections = 0;
-for (const term of terms) {
-    if (term.lang !== "English") continue;
-    if (!term.starting) continue;
-
-    const allConnectedTerms = getConnectedTerms(term, termsStartingWith);
-    connectedTermsForId[term.id] = allConnectedTerms;
-    numConnections += allConnectedTerms.length;
-}
-console.log("done " + numConnections);
-
-const rootNode = terms.find(term => term.term.toLowerCase() === "helicopter" && term.lang === "English");
-
-const baseTerms = [];
-const bgColors = {};
-
 // Random walk to create a path.
-function createPathRandomWalk(rootNode, baseTerms, bgColors, connectedTermsForId) {
+function createPathRandomWalk(rootNode, connectedTermsForId) {
+    const baseTerms = [];
     baseTerms.push(rootNode);
     while (baseTerms.length < 10) {
         const prevTerm = baseTerms[baseTerms.length - 1];
@@ -137,14 +120,15 @@ function createPathRandomWalk(rootNode, baseTerms, bgColors, connectedTermsForId
         const connectedTerms = connectedTermsForId[prevTerm.id] || [];
         if (connectedTerms.length === 0) break;
         const connectedTerm = connectedTerms[Math.floor(Math.random() * connectedTerms.length)];
-        bgColors[connectedTerm.commonTerm.id] = "#ddffdd";
 
         baseTerms.push(connectedTerm.connectedTerm);
     }
+    return baseTerms;
 }
 
 // Walk the graph.
-function createPathLongest(rootNode, baseTerms, bgColors, connectedTermsForId) {
+function createPathLongest(rootNode, connectedTermsForId) {
+    const baseTerms = [];
     const queue = [];
     const visited = {};
     queue.push({ term: rootNode, depth: 0 });
@@ -154,16 +138,17 @@ function createPathLongest(rootNode, baseTerms, bgColors, connectedTermsForId) {
     var maxTerm = rootNode;
     while (queue.length > 0) {
         const { term, depth } = queue.shift();
-        console.log(term.term + " " + depth);
         if (depth > maxDepth) {
             maxDepth = depth;
             maxTerm = term;
         }
         if (depth > 10) break;
-        // printTerm("", term);
         const connectedTerms = connectedTermsForId[term.id] || [];
         // Randomize the order of the connected terms.
-        connectedTerms.sort(() => Math.random() - 0.5);
+        for (const connectedTerm of connectedTerms) {
+            connectedTerm.seed = Math.random();
+        }
+        connectedTerms.sort((a, b) => a.seed - b.seed);
         for (const connectedTerm of connectedTerms) {
             if (visited[connectedTerm.connectedTerm.id]) continue;
             visited[connectedTerm.connectedTerm.id] = term.id;
@@ -178,10 +163,41 @@ function createPathLongest(rootNode, baseTerms, bgColors, connectedTermsForId) {
         currentTerm = termsForId[visited[currentTerm.id]];
     }
     baseTerms.unshift(rootNode);
+    return baseTerms;
 }
 
+function paintConnectingTerms(baseTerms) {
+    const bgColors = {};
+    for (let i = 0; i < baseTerms.length - 1; i++) {
+        const term1 = baseTerms[i];
+        const term2 = baseTerms[i + 1];
+        const commonTerm = lowestCommonTerm(term1, term2);
+        bgColors[commonTerm.id] = "#ddffdd";
+    }
+    return bgColors;
+}
 
-// createPathRandomWalk(rootNode, baseTerms, bgColors, connectedTermsForId);
-createPathLongest(rootNode, baseTerms, bgColors, connectedTermsForId);
+console.log("Creating connection graph");
+const connectedTermsForId = {};
+var numConnections = 0;
+for (const term of terms) {
+    if (term.lang !== "English") continue;
+    if (!term.starting) continue;
 
+    const allConnectedTerms = getConnectedTerms(term, termsStartingWith, termsForId);
+    connectedTermsForId[term.id] = allConnectedTerms;
+    numConnections += allConnectedTerms.length;
+}
+console.log("done " + numConnections);
+
+const rootNode = terms.find(term => term.term.toLowerCase() === "helicopter" && term.lang === "English");
+
+// const baseTerms = createPathRandomWalk(rootNode, connectedTermsForId);
+const baseTerms = createPathLongest(rootNode, connectedTermsForId);
+
+const bgColors = paintConnectingTerms(baseTerms);
+
+for (const term of baseTerms) {
+    printTerm("", term);
+}
 exportGraphManual("../data/graph/", baseTerms, bgColors);
