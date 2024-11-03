@@ -44,6 +44,7 @@ function parseLeaf(relation) {
         lang: relation.related_lang,
         parents: [],
         type: relation.reltype,
+        debugRawRelations: [relation],
     }
 }
 
@@ -129,6 +130,16 @@ function termFromRelations(termRoot, childRelations) {
 
     var prevTerm = termRoot;
     for (const childGroup of childGroups) {
+        // We typically expect the prevTerm.parents to be empty. In rare cases (e.g "telescope") it may not be,
+        // because the prevTerm is a compound term.
+        if (prevTerm.parents.length > 0) {
+            const rawChildRelation = (childGroup?.debugRawRelations && childGroup?.debugRawRelations.length > 0) ? childGroup.debugRawRelations[0] : null;
+            const firstParent = prevTerm.parents[0];
+            // It's guaranteed (I checked) that firstParent has no parents.
+            firstParent.parents.push(childGroup);
+            prevTerm = childGroup;
+            continue;
+        }
         prevTerm.parents.push(childGroup);
         prevTerm = childGroup;
     }
@@ -299,24 +310,24 @@ const results = Papa.parse(data, {
 }).data;
 
 const interestingTerms = [
-    "pteranodon",
-    "autobiography",
-    "arachniphobia",
-    "gentleman",
-    "gentle",
-    "man",
+    // "pteranodon",
+    // "autobiography",
+    // "arachniphobia",
+    // "gentleman",
+    // "gentle",
+    // "man",
     "telescope",
-    "escalator",
-    "escalate",
-    "helicopter",
-    "japanese",
-    "japan",
-    "englishman",
-    "blindspot",
-    "microwave",
-    "山中部",
-    "heliocentric",
-    "hemipteral",
+    // "escalator",
+    // "escalate",
+    // "helicopter",
+    // "japanese",
+    // "japan",
+    // "englishman",
+    // "blindspot",
+    // "microwave",
+    // "山中部",
+    // "heliocentric",
+    // "hemipteral",
 ];
 const interestingTermsMap = interestingTerms.reduce((acc, term) => {
     acc[term.toLowerCase()] = true;
