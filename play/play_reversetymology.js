@@ -3,7 +3,7 @@ import { printTerm, walkTerm, loadStoredTerms } from './terms.js';
 const terms = loadStoredTerms('../data/');
 
 // Words that went to a different language and then came back.
-/**
+/**/
 const interestingLangs = {
     "English": true,
     // "Japanese": true,
@@ -34,7 +34,7 @@ for (const origTerm of terms) {
 /**/
 
 // Unusual etymologies.
-// /**
+/**
 for (const origTerm of terms) {
     if (origTerm.term.toLowerCase() !== "さかな") continue;
 

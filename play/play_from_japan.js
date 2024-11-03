@@ -29,7 +29,7 @@ for (const englishTerm of terms.filter(term => term.lang === "English")) {
 }
 /**/
 
-/**
+/**/
 // Japanese words that have English origins.
 const obviousAncestors = {
     "Japanese": true,
@@ -47,28 +47,19 @@ const obviousAncestors = {
 const obviousRelations = {
     "calque_of": true,
 }
-for (const japaneseTerm of terms.filter(term => term.lang === "Japanese")) {
-    if (!containsKanji(japaneseTerm.term) || containsKatakana(japaneseTerm.term)) {
-        continue;
-    }
+for (const baseTerm of terms.filter(term => term.lang === "Japanese")) {
+    if (!containsKanji(baseTerm.term) || containsKatakana(baseTerm.term)) continue;
     // Pick the first non-obvious non-Japanese parent of a Japanese term.
-    var englishParent = null;
-    walkTerm(japaneseTerm, term => {
-        if (englishParent) return;
-        if (term.lang !== "Japanese") return;
+    var interestingParent = null;
+    walkTerm(baseTerm, term => {
+        if (interestingParent || term.lang !== baseTerm.lang) return;
         for (const parent of term.parents) {
-            if (obviousAncestors[parent.lang]) continue;
-            if (obviousRelations[parent.type]) continue;
-
-            console.log("Found: " + term.term + "(" + term.lang + ") <- " + parent.term + "(" + parent.lang + ")" + " " + parent.type);
-
-            englishParent = term;
+            if (obviousAncestors[parent.lang] || obviousRelations[parent.type]) continue;
+            interestingParent = term;
             return;
         }
     });
-    if (englishParent) {
-        printTerm("", japaneseTerm);
-    }
+    if (interestingParent) printTerm("", baseTerm);
 }
 /**/
 

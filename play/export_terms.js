@@ -168,6 +168,10 @@ function processTermRelations(relations, interestingTermsMap) {
 
     const interesting = interestingTermsMap[relations[0].term.toLowerCase()];
 
+    if (relations[0].term === "buccinoid") {
+        printRaw(relations);
+    }
+
     const relationByGroup = {};
     for (const relation of relations) {
         if (relation.group_tag) {
@@ -206,6 +210,9 @@ function processTermRelations(relations, interestingTermsMap) {
     // Non-group ancestries are handled separately.
 
     if (relationsWithoutParents.length === 1) {
+        // Corner case: some bad data like "buccinoid" has a single has_suffix.
+        if (relationsWithoutParents[0].reltype === "has_suffix") return null;
+
         return termFromRelations(termRoot, relationsWithoutParents);
     }
 
@@ -230,6 +237,8 @@ function processTermRelations(relations, interestingTermsMap) {
     }
 
     // Catch all
+    // Sometimes the first relation is a has_suffix. In that case we just ignore it.
+    if (relationsWithoutParents[0].reltype === "has_suffix") return;
     termRoot.parents.push(parseLeaf(relationsWithoutParents[0]));
     if (relationsWithoutParents.length >= 2 && relationsWithoutParents[1].reltype === "has_suffix") {
         termRoot.parents.push(parseLeaf(relationsWithoutParents[1]));
@@ -354,7 +363,8 @@ const interestingTerms = [
     // "山中部",
     // "heliocentric",
     // "hemipteral",
-    "さかな",
+    // "さかな",
+    "buccinoid",
 ];
 const interestingTermsMap = interestingTerms.reduce((acc, term) => {
     acc[term.toLowerCase()] = true;
@@ -367,16 +377,16 @@ for (const term of terms) {
     if (interestingTermsMap[term.term.toLowerCase()]) {
         console.log("------------");
         printTerm("", term);
-        // console.log("raw:");
-        // printRaw(term.debugRawRelations);
+        console.log("raw:");
+        printRaw(term.debugRawRelations);
         console.log();
     }
-    // if (term.term.toLowerCase() === "hemipterus" && term.lang === "Latin") {
-    //     console.log("------------");
-    //     printTerm("", term);
-    //     console.log("raw:");
-    //     printRaw(term.debugRawRelations);
-    // }
+    if (term.term.toLowerCase() === "billion" && term.lang === "French") {
+        console.log("------------");
+        printTerm("", term);
+        console.log("raw:");
+        printRaw(term.debugRawRelations);
+    }
 }
 
 // Delete term.debugRawRelations for saving.
