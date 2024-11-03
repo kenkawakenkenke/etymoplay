@@ -1,24 +1,44 @@
-import fs from 'fs';
-import { printTerm, walkTerm } from './terms.js';
+import { printTerm, walkTerm, loadStoredTerms } from './terms.js';
 
-// Map of terms keyed by their IDs.
-const terms = JSON.parse(fs.readFileSync('../data/terms.json', 'utf8'));
+const terms = loadStoredTerms('../data/');
 
-// English words that have Japanese origins.
-/**/
-for (const englishTerm of Object.values(terms).filter(term => term.lang === "English")) {
-    // Ignore any english terms that start with upper case (as they tend to be names.)
-    if (englishTerm.term.match(/^[A-Z]/)) continue;
+// Words that went to a different language and then came back.
+/**
+const interestingLangs = {
+    "English": true,
+    // "Japanese": true,
+};
+for (const origTerm of terms) {
+    if (!interestingLangs[origTerm.lang]) continue;
 
-    var hasJapaneseParent = false;
-    walkTerm(englishTerm, term => {
-        if (term.lang === "Japanese") {
-            hasJapaneseParent = true;
+    var interestingParent = null;
+    walkTerm(origTerm, term => {
+        if (interestingParent) return;
+        if (term.lang === origTerm.lang) return;
+        for (const parent of term.parents) {
+            if (parent.lang === origTerm.lang) {
+                // if (obviousRelations[parent.type]) continue;
+
+                // console.log("Found: " + term.term + "(" + term.lang + ") <- " + parent.term + "(" + parent.lang + ")" + " " + parent.type);
+
+                interestingParent = term;
+
+                return;
+            }
         }
     });
-    if (hasJapaneseParent) {
-        printTerm("", englishTerm);
+    if (interestingParent) {
+        printTerm("", origTerm);
     }
+}
+/**/
+
+// Unusual etymologies.
+// /**
+for (const origTerm of terms) {
+    if (origTerm.term.toLowerCase() !== "さかな") continue;
+
+    printTerm("", origTerm);
 }
 /**/
 

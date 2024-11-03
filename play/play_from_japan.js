@@ -1,12 +1,19 @@
 import fs from 'fs';
-import { printTerm, walkTerm } from './terms.js';
+import { printTerm, walkTerm, loadStoredTerms } from './terms.js';
 
-// Map of terms keyed by their IDs.
-const terms = JSON.parse(fs.readFileSync('../data/terms.json', 'utf8'));
+function containsKanji(term) {
+    return term.match(/[\u4E00-\u9FFF]+/);
+}
+
+function containsKatakana(term) {
+    return term.match(/.*[\u30A0-\u30FFA-zあ-ん]+.*/);
+}
+
+const terms = loadStoredTerms('../data/');
 
 // English words that have Japanese origins.
 /**
-for (const englishTerm of Object.values(terms).filter(term => term.lang === "English")) {
+for (const englishTerm of terms.filter(term => term.lang === "English")) {
     // Ignore any english terms that start with upper case (as they tend to be names.)
     if (englishTerm.term.match(/^[A-Z]/)) continue;
 
@@ -22,6 +29,7 @@ for (const englishTerm of Object.values(terms).filter(term => term.lang === "Eng
 }
 /**/
 
+/**
 // Japanese words that have English origins.
 const obviousAncestors = {
     "Japanese": true,
@@ -36,22 +44,32 @@ const obviousAncestors = {
     "Cantonese": true,
     "Proto-Japonic": true,
 };
-for (const japaneseTerm of Object.values(terms).filter(term => term.lang === "Japanese")) {
-    // Select only terms that contain kanji.
-    if (!japaneseTerm.term.match(/[\u4E00-\u9FFF]+/)) {
+const obviousRelations = {
+    "calque_of": true,
+}
+for (const japaneseTerm of terms.filter(term => term.lang === "Japanese")) {
+    if (!containsKanji(japaneseTerm.term) || containsKatakana(japaneseTerm.term)) {
         continue;
     }
-    // Ignore any japanese terms that contain Katakana.
-    if (japaneseTerm.term.match(/.*[\u30A0-\u30FFA-zあ-ん]+.*/)) {
-        continue;
-    }
+    // Pick the first non-obvious non-Japanese parent of a Japanese term.
     var englishParent = null;
     walkTerm(japaneseTerm, term => {
-        if (!obviousAncestors[term.lang] && !englishParent) englishParent = term;
+        if (englishParent) return;
+        if (term.lang !== "Japanese") return;
+        for (const parent of term.parents) {
+            if (obviousAncestors[parent.lang]) continue;
+            if (obviousRelations[parent.type]) continue;
+
+            console.log("Found: " + term.term + "(" + term.lang + ") <- " + parent.term + "(" + parent.lang + ")" + " " + parent.type);
+
+            englishParent = term;
+            return;
+        }
     });
-    if (englishParent && englishParent.type !== "calque_of") {
+    if (englishParent) {
         printTerm("", japaneseTerm);
     }
 }
+/**/
 
 
