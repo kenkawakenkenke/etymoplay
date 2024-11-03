@@ -267,27 +267,52 @@ function loadTerms(results, interestingTermsMap) {
         if (term.parents.length === 0) {
             continue;
         }
-        // Kill self references.
-        if (hasChildId(term, term.id)) {
-            continue;
+
+        // Kill recursion.
+        function killCycle(t, path = []) {
+            path.push(t.id);
+
+            const filteredParents = [];
+            for (const parent of t.parents) {
+                if (path.includes(parent.id)) {
+                    // Cycle. Ignore.
+                } else {
+                    filteredParents.push(parent);
+                    killCycle(parent, path);
+                }
+            }
+            t.parents = filteredParents;
+            path.pop();
         }
+        killCycle(term);
+
         termForId[term.id] = term;
         terms.push(term);
     }
 
     // Expand leaves.
     for (const term of terms) {
-        for (const leaf of getLeaves(term, [])) {
-            const moreParents = termForId[leaf.id]?.parents || [];
 
-            for (const child of moreParents) {
-                const termIds = getAllIds(term, {});
+        const leaves = [];
+        walkTerm(term, (term, path) => {
+            if (term.parents.length > 0) return;
+            const leaf = term;
+
+            const termsUpToLeaf = {};
+            for (const t of path) termsUpToLeaf[t.id] = true;
+            leaves.push({ leaf, termsUpToLeaf });
+        });
+
+        for (const { leaf, termsUpToLeaf } of leaves) {
+            const graftRoot = termForId[leaf.id];
+            if (!graftRoot) continue;
+
+            for (const child of graftRoot.parents) {
                 const childIds = getAllIds(child, {});
-
                 // See if there are any intersections between termIds and childIds (except for term.id).
                 let hasIntersection = false;
                 for (const id of Object.keys(childIds)) {
-                    if (id !== term.id && termIds[id]) {
+                    if (termsUpToLeaf[id]) {
                         hasIntersection = true;
                         break;
                     }
@@ -298,6 +323,7 @@ function loadTerms(results, interestingTermsMap) {
             }
         }
     }
+
     return terms;
 }
 
@@ -310,24 +336,24 @@ const results = Papa.parse(data, {
 }).data;
 
 const interestingTerms = [
-    // "pteranodon",
-    // "autobiography",
-    // "arachniphobia",
-    // "gentleman",
-    // "gentle",
-    // "man",
+    "pteranodon",
+    "autobiography",
+    "arachniphobia",
+    "gentleman",
+    "gentle",
+    "man",
     "telescope",
-    // "escalator",
-    // "escalate",
-    // "helicopter",
-    // "japanese",
-    // "japan",
-    // "englishman",
-    // "blindspot",
-    // "microwave",
-    // "山中部",
-    // "heliocentric",
-    // "hemipteral",
+    "escalator",
+    "escalate",
+    "helicopter",
+    "japanese",
+    "japan",
+    "englishman",
+    "blindspot",
+    "microwave",
+    "山中部",
+    "heliocentric",
+    "hemipteral",
 ];
 const interestingTermsMap = interestingTerms.reduce((acc, term) => {
     acc[term.toLowerCase()] = true;
@@ -340,8 +366,8 @@ for (const term of terms) {
     if (interestingTermsMap[term.term.toLowerCase()]) {
         console.log("------------");
         printTerm("", term);
-        console.log("raw:");
-        printRaw(term.debugRawRelations);
+        // console.log("raw:");
+        // printRaw(term.debugRawRelations);
         console.log();
     }
     // if (term.term.toLowerCase() === "hemipterus" && term.lang === "Latin") {
@@ -359,5 +385,5 @@ for (const term of terms) {
     });
 }
 
-// exportTerms(terms, '../data/', 150000);
+exportTerms(terms, '../data/', 150000);
 

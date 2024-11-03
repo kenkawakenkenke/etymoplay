@@ -48,11 +48,13 @@ export function printTerm(prefix, term) {
     }
 }
 
-export function walkTerm(term, f) {
-    f(term);
+export function walkTerm(term, f, path = []) {
+    f(term, path);
+    path.push(term);
     for (const parent of term.parents) {
-        walkTerm(parent, f);
+        walkTerm(parent, f, path);
     }
+    path.pop();
 }
 
 // Read all the chunks.
